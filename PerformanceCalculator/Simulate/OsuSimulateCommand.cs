@@ -26,6 +26,26 @@ namespace PerformanceCalculator.Simulate
         public override string Beatmap { get; }
 
         [UsedImplicitly]
+        [Option(Template = "-r|--range", Description = "Wheater or not to range accuracies.  Defaults to false.")]
+        public override bool Range { get; } = false;
+
+        [UsedImplicitly]
+        [Option(Template = "-l|--lower <lower>", Description = "Lower bound for accuracy. Defaults to 90.")]
+        public override double Lower { get; } = 90;
+
+        [UsedImplicitly]
+        [Option(Template = "-u|--upper <upper>", Description = "Upper bound for accuracy. Defaults to 100.")]
+        public override double Upper { get; } = 100;
+
+        [UsedImplicitly]
+        [Option(Template = "-s|--step <step>", Description = "Step for accuracy. Defaults to 0.1.")]
+        public override double Step { get; } = 0.1;
+
+        [UsedImplicitly]
+        [Option(Template = "-f|--file <file.json>", Description = "File name to write JSON to.")]
+        public override string File { get; } = "data.json";
+
+        [UsedImplicitly]
         [Option(Template = "-a|--accuracy <accuracy>", Description = "Accuracy. Enter as decimal 0-100. Defaults to 100."
                                                                      + " Scales hit results as well and is rounded to the nearest possible value for the beatmap.")]
         public override double Accuracy { get; } = 100;

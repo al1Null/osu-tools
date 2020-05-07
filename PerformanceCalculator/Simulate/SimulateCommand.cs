@@ -9,6 +9,7 @@ using JetBrains.Annotations;
 using McMaster.Extensions.CommandLineUtils;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets;
+using osu.Game.Rulesets.Difficulty;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -20,6 +21,21 @@ namespace PerformanceCalculator.Simulate
         public abstract string Beatmap { get; }
 
         public abstract Ruleset Ruleset { get; }
+
+        [UsedImplicitly]
+        public virtual bool Range { get; }
+
+        [UsedImplicitly]
+        public virtual double Lower { get; }
+
+        [UsedImplicitly]
+        public virtual double Upper { get; }
+
+        [UsedImplicitly]
+        public virtual double Step { get; }
+
+        [UsedImplicitly]
+        public virtual string File { get; }
 
         [UsedImplicitly]
         public virtual double Accuracy { get; }
@@ -57,34 +73,88 @@ namespace PerformanceCalculator.Simulate
 
             var beatmapMaxCombo = GetMaxCombo(beatmap);
             var maxCombo = Combo ?? (int)Math.Round(PercentCombo / 100 * beatmapMaxCombo);
-            var statistics = GenerateHitResults(Accuracy / 100, beatmap, Misses, Mehs, Goods);
-            var score = Score;
-            var accuracy = GetAccuracy(statistics);
 
-            var scoreInfo = new ScoreInfo
+            // check if range
+            if (Range && Combo != null)
             {
-                Accuracy = accuracy,
-                MaxCombo = maxCombo,
-                Statistics = statistics,
-                Mods = mods,
-                TotalScore = score
-            };
+                int size = (int)((Upper - Lower) / Step);
+                var accuracyPerformance = new Dictionary<double, double>();
 
-            var categoryAttribs = new Dictionary<string, double>();
-            double pp = ruleset.CreatePerformanceCalculator(workingBeatmap, scoreInfo).Calculate(categoryAttribs);
+                // get acc and performance ranges
+                double acc = Lower;
+                var statistics = GenerateHitResults(acc, beatmap, Misses, null, null);
+                int i = 0;
+                while (acc <= Upper)
+                {
+                    statistics = GenerateHitResults(acc, beatmap, Misses, null, null);
+                    var score = Score;
+                    var accuracy = GetAccuracy(statistics);
+                    var scoreInfo = new ScoreInfo
+                    {
+                        Accuracy = accuracy,
+                        MaxCombo = maxCombo,
+                        Statistics = statistics,
+                        Mods = mods,
+                        TotalScore = score
+                    };
+                    var categoryAttribs = new Dictionary<string, double>();
+                    double pp = ruleset.CreatePerformanceCalculator(workingBeatmap, scoreInfo).Calculate(categoryAttribs);
 
-            Console.WriteLine(workingBeatmap.BeatmapInfo.ToString());
+                    accuracyPerformance.Add(accuracy, pp);
 
-            WritePlayInfo(scoreInfo, beatmap);
+                    acc += Step;
+                    i++;
+                }
 
-            WriteAttribute("Mods", mods.Length > 0
-                ? mods.Select(m => m.Acronym).Aggregate((c, n) => $"{c}, {n}")
-                : "None");
+                DifficultyAttributes diffAttrs = ruleset.CreateDifficultyCalculator(workingBeatmap).Calculate(mods);
+                // create analysis for data
+                var data = new AnalysisData()
+                {
+                    BeatmapId = workingBeatmap.BeatmapInfo.OnlineBeatmapID.ToString(),
+                    AccuracyPerformance = accuracyPerformance,
+                    Combo = (int)Combo,
+                    Miss = Misses,
+                    Stars = diffAttrs.StarRating,
+                    //OverallDifficulty = diffAttrs.
+                    //ApproachRate = 0
+                };
 
-            foreach (var kvp in categoryAttribs)
-                WriteAttribute(kvp.Key, kvp.Value.ToString(CultureInfo.InvariantCulture));
 
-            WriteAttribute("pp", pp.ToString(CultureInfo.InvariantCulture));
+            }
+            else
+            {
+                var statistics = GenerateHitResults(Accuracy / 100, beatmap, Misses, Mehs, Goods);
+                var score = Score;
+                var accuracy = GetAccuracy(statistics);
+
+                var scoreInfo = new ScoreInfo
+                {
+                    Accuracy = accuracy,
+                    MaxCombo = maxCombo,
+                    Statistics = statistics,
+                    Mods = mods,
+                    TotalScore = score
+                };
+
+                var categoryAttribs = new Dictionary<string, double>();
+                double pp = ruleset.CreatePerformanceCalculator(workingBeatmap, scoreInfo).Calculate(categoryAttribs);
+
+                var diffAttrs = ruleset.CreateDifficultyCalculator(workingBeatmap).Calculate(mods);
+
+                Console.WriteLine(workingBeatmap.BeatmapInfo.ToString());
+
+                WritePlayInfo(scoreInfo, beatmap);
+
+                WriteAttribute("Mods", mods.Length > 0
+                    ? mods.Select(m => m.Acronym).Aggregate((c, n) => $"{c}, {n}")
+                    : "None");
+
+                foreach (var kvp in categoryAttribs)
+                    WriteAttribute(kvp.Key, kvp.Value.ToString(CultureInfo.InvariantCulture));
+
+                WriteAttribute("pp", pp.ToString(CultureInfo.InvariantCulture));
+            }
+            
         }
 
         private List<Mod> getMods(Ruleset ruleset)
